@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { chatAPI, ticketAPI } from '../services/api';
+import { chatAPI, ticketAPI, aiAPI } from '../services/api';
 import { useSocketContext } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -11,8 +11,11 @@ const ChatView = () => {
   const [messages, setMessages] = useState([]);
   const [inputMsg, setInputMsg] = useState('');
   const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [sentiment, setSentiment] = useState('neutral');
   const [filter, setFilter] = useState('open'); // 'open' or 'closed'
+  const [ticketForm, setTicketForm] = useState({ priority: '', status: '', category: '' });
   
   const { user } = useAuth();
   const { socket } = useSocketContext();
@@ -117,7 +120,13 @@ const ChatView = () => {
     try {
       setActiveChat(chat);
       setAiSuggestion(chat.lastAISuggestion || null);
+      setAiSummary(null);
       setSentiment(chat.sentiment || 'neutral');
+      setTicketForm({
+        priority: chat.Ticket?.priority || 'medium',
+        status: chat.Ticket?.status || 'open',
+        category: chat.Ticket?.category || 'general'
+      });
       const res = await chatAPI.getChatById(chat.id);
       setMessages(res.data.data.Messages || []);
       if (socket) {
@@ -173,10 +182,10 @@ const ChatView = () => {
     if (aiSuggestion) setInputMsg(aiSuggestion);
   };
 
-  const updateTicket = async (updates) => {
+  const updateTicket = async () => {
     if (!activeChat || !activeChat.Ticket) return;
     try {
-      const res = await ticketAPI.updateTicket(activeChat.Ticket.id, updates);
+      const res = await ticketAPI.updateTicket(activeChat.Ticket.id, ticketForm);
       const updatedTicket = res.data.data;
       setActiveChat({ ...activeChat, Ticket: updatedTicket });
       setChats(chats.map(c => c.id === activeChat.id ? { ...c, Ticket: updatedTicket } : c));
@@ -196,6 +205,20 @@ const ChatView = () => {
       toast.success('Chat closed');
     } catch (err) {
       toast.error('Failed to close chat');
+    }
+  };
+
+  const generateSummary = async () => {
+    if (!activeChat) return;
+    try {
+      setIsSummarizing(true);
+      const res = await aiAPI.getSummary(activeChat.id);
+      setAiSummary(res.data.data.summary);
+      toast.success('Summary Generated');
+    } catch (err) {
+      toast.error('Failed to generate summary');
+    } finally {
+      setIsSummarizing(false);
     }
   };
 
@@ -349,16 +372,24 @@ const ChatView = () => {
 
               {/* Ticket Management Section */}
               <div className="glass-card p-4 rounded-xl shadow-md border border-slate-700/50 bg-slate-800/40">
-                <h3 className="font-bold text-sm text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-widest">
-                  <MessageSquare size={14}/> Ticket Info
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-sm text-slate-300 flex items-center gap-2 uppercase tracking-widest">
+                    <MessageSquare size={14}/> Ticket Info
+                  </h3>
+                  <button 
+                    onClick={updateTicket}
+                    className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-tighter bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 transition-all active:scale-95"
+                  >
+                    Save Changes
+                  </button>
+                </div>
                 
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Priority</label>
                     <select 
-                      value={activeChat.Ticket?.priority || 'medium'}
-                      onChange={(e) => updateTicket({ priority: e.target.value })}
+                      value={ticketForm.priority}
+                      onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary"
                     >
                       <option value="low">Low</option>
@@ -370,8 +401,8 @@ const ChatView = () => {
                   <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Status</label>
                     <select 
-                      value={activeChat.Ticket?.status || 'open'}
-                      onChange={(e) => updateTicket({ status: e.target.value })}
+                      value={ticketForm.status}
+                      onChange={(e) => setTicketForm({ ...ticketForm, status: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary"
                     >
                       <option value="open">Open</option>
@@ -384,12 +415,39 @@ const ChatView = () => {
                     <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Category</label>
                     <input 
                       type="text"
-                      value={activeChat.Ticket?.category || 'general'}
-                      onChange={(e) => updateTicket({ category: e.target.value })}
+                      value={ticketForm.category}
+                      onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="glass-card p-4 rounded-xl shadow-lg border border-slate-700/50 relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-1 h-full bg-amber-500 group-hover:w-2 transition-all"></div>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-bold text-sm text-slate-300">AI Summary</h3>
+                  <button 
+                    type="button"
+                    onClick={generateSummary}
+                    disabled={isSummarizing}
+                    className="text-[10px] font-bold text-amber-500 hover:text-amber-400 uppercase tracking-widest disabled:opacity-50"
+                  >
+                    {isSummarizing ? 'Generating...' : 'Regenerate'}
+                  </button>
+                </div>
+                {aiSummary ? (
+                  <p className="text-xs text-slate-400 leading-relaxed">{aiSummary}</p>
+                ) : (
+                  <button 
+                    type="button"
+                    onClick={generateSummary}
+                    disabled={isSummarizing}
+                    className="w-full py-2 border border-dashed border-slate-700 rounded-lg text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {isSummarizing ? 'Generating Summary...' : 'Generate Summary'}
+                  </button>
+                )}
               </div>
 
               <div className="glass-card p-4 rounded-xl shadow-lg border border-slate-700/50 relative overflow-hidden group">

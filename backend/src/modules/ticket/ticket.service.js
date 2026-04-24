@@ -1,8 +1,13 @@
 const { Ticket, User } = require('../../models');
 const { Op } = require('sequelize');
+const { notifyHighPriorityTicket } = require('../notification/notification.service');
 
 const createTicket = async ({ chatId, companyId, priority = 'medium', category = 'general', title }) => {
-  return Ticket.create({ chatId, companyId, priority, category, title, status: 'open' });
+  const ticket = await Ticket.create({ chatId, companyId, priority, category, title, status: 'open' });
+  if (priority === 'high') {
+    notifyHighPriorityTicket(companyId, ticket);
+  }
+  return ticket;
 };
 
 const getTickets = async (companyId, { status, priority, assignedTo, page = 1, limit = 20 }) => {
@@ -27,12 +32,18 @@ const updateTicket = async (ticketId, companyId, updates) => {
   const ticket = await Ticket.findOne({ where: { id: ticketId, companyId } });
   if (!ticket) throw new Error('Ticket not found');
 
+  const oldPriority = ticket.priority;
   const allowed = ['status', 'priority', 'category', 'assignedTo', 'title'];
   allowed.forEach((field) => {
     if (updates[field] !== undefined) ticket[field] = updates[field];
   });
 
   await ticket.save();
+
+  if (ticket.priority === 'high' && oldPriority !== 'high') {
+    notifyHighPriorityTicket(companyId, ticket);
+  }
+
   return ticket;
 };
 

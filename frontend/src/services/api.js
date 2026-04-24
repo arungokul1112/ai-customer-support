@@ -39,4 +39,14 @@ export const analyticsAPI = {
   getVolume: () => api.get('/analytics/volume'),
 };
 
+export const userAPI = {
+  getAgents: () => api.get('/users/agents'),
+  createAgent: (data) => api.post('/users/agents', data),
+  updateUser: (id, data) => api.put(`/users/${id}`, data),
+};
+
+export const aiAPI = {
+  getSummary: (chatId) => api.post('/ai/summarize', { chatId }),
+};
+
 export default api;
