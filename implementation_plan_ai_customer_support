@@ -1,0 +1,439 @@
+# 🚀 AI Customer Support Copilot — Implementation Plan
+
+## Overview
+
+Build a scalable SaaS-based AI Customer Support Copilot using **Node.js, React.js, PostgreSQL, Sequelize ORM, Socket.io, and Ollama** (local AI). The platform enables businesses to manage customer conversations in real-time with AI-powered agent assistance.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Ollama Dependency**: The AI features require [Ollama](https://ollama.com/) running locally with `llama3` or `mistral` models pulled. AI features will gracefully degrade if Ollama is unavailable.
+
+> [!IMPORTANT]
+> **PostgreSQL Required**: You must have a PostgreSQL instance running locally (default: `localhost:5432`). The plan assumes database name `ai_support_db` with user `postgres`.
+
+> [!WARNING]
+> **Tailwind CSS**: Your spec requests Tailwind CSS. I'll use **Tailwind CSS v3** via CDN/PostCSS for the React frontend. Please confirm if you'd prefer a different version.
+
+> [!IMPORTANT]
+> **Phased Delivery**: Due to project size, I'll implement in **3 phases** as per your MVP roadmap. Phase 1 will be built first, then Phase 2 and 3 after your review.
+
+---
+
+## Phase 1: Foundation (Auth + Chat + Basic UI)
+
+### Backend Core
+
+---
+
+#### [NEW] [package.json](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/package.json)
+- Project metadata and dependencies
+- Scripts: `dev`, `start`, `db:sync`
+- Dependencies: `express`, `sequelize`, `pg`, `pg-hstore`, `socket.io`, `jsonwebtoken`, `bcryptjs`, `cors`, `dotenv`, `axios`, `uuid`, `helmet`, `morgan`
+- Dev dependencies: `nodemon`
+
+#### [NEW] [.env](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/.env)
+- Database credentials, JWT secret, Ollama URL, port config
+
+#### [NEW] [server.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/server.js)
+- Entry point: creates HTTP server, attaches Socket.io, syncs DB, starts listening
+
+#### [NEW] [app.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/app.js)
+- Express app setup: middleware (cors, helmet, morgan, json parser), route mounting
+
+---
+
+### Config Layer
+
+---
+
+#### [NEW] [src/config/db.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/config/db.js)
+- Sequelize instance creation with PostgreSQL connection
+- Connection pool configuration
+- Error handling and logging
+
+#### [NEW] [src/config/socket.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/config/socket.js)
+- Socket.io server initialization and export
+- CORS config for socket connections
+- Connection/disconnection logging
+
+---
+
+### Models (Sequelize)
+
+---
+
+#### [NEW] [src/models/index.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/index.js)
+- Central model registry
+- Import and associate all models
+- Define relationships:
+  - `Company` 1:N `User`
+  - `Company` 1:N `Chat`
+  - `Chat` 1:N `Message`
+  - `Chat` 1:1 `Ticket`
+  - `User` 1:N `Ticket` (assignedTo)
+  - `Chat` 1:N `AILog`
+
+#### [NEW] [src/models/Company.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/Company.js)
+- `id` (UUID, PK), `name` (STRING, NOT NULL), `createdAt`, `updatedAt`
+
+#### [NEW] [src/models/User.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/User.js)
+- `id` (UUID, PK), `name`, `email` (unique per company), `password` (hashed), `role` (ENUM: admin/agent), `companyId` (FK)
+- Password hashing via `beforeCreate` hook
+
+#### [NEW] [src/models/Chat.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/Chat.js)
+- `id` (UUID, PK), `companyId` (FK), `customerName`, `customerEmail`, `status` (ENUM: open/closed), `sentiment` (ENUM: angry/neutral/happy, default neutral)
+
+#### [NEW] [src/models/Message.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/Message.js)
+- `id` (UUID, PK), `chatId` (FK), `senderType` (ENUM: customer/agent/ai), `message` (TEXT), `createdAt`
+
+#### [NEW] [src/models/Ticket.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/Ticket.js)
+- `id` (UUID, PK), `chatId` (FK), `assignedTo` (FK → User), `status` (ENUM: open/resolved), `priority` (ENUM: low/medium/high), `category` (STRING, for issue classification)
+
+#### [NEW] [src/models/AILog.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/models/AILog.js)
+- `id` (UUID, PK), `chatId` (FK), `type` (STRING: suggestion/summary/sentiment/classification), `prompt` (TEXT), `response` (TEXT)
+
+---
+
+### Auth Module
+
+---
+
+#### [NEW] [src/modules/auth/auth.controller.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/auth/auth.controller.js)
+- `register` — Create company + admin user (signup flow)
+- `login` — Authenticate user, return JWT
+- `getProfile` — Return current user info
+
+#### [NEW] [src/modules/auth/auth.service.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/auth/auth.service.js)
+- Business logic for registration, login, token generation
+- Password hashing with bcryptjs
+- JWT token creation (24h expiry)
+
+#### [NEW] [src/modules/auth/auth.routes.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/auth/auth.routes.js)
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/profile` (protected)
+
+#### [NEW] [src/middlewares/auth.middleware.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/middlewares/auth.middleware.js)
+- `verifyToken` — Extract and validate JWT from Authorization header
+- `roleCheck(roles)` — Verify user role matches allowed roles
+
+---
+
+### User Module
+
+---
+
+#### [NEW] [src/modules/user/user.controller.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/user/user.controller.js)
+- `getAgents` — List agents for the company (admin only)
+- `createAgent` — Admin creates agent accounts
+- `updateUser` — Update user profile
+
+#### [NEW] [src/modules/user/user.service.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/user/user.service.js)
+- Business logic for user CRUD scoped to company
+
+#### [NEW] [src/modules/user/user.routes.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/user/user.routes.js)
+- `GET /api/users/agents` (admin)
+- `POST /api/users/agents` (admin)
+- `PUT /api/users/:id` (admin)
+
+---
+
+### Chat Module
+
+---
+
+#### [NEW] [src/modules/chat/chat.controller.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/chat/chat.controller.js)
+- `getChats` — List all chats for company (with filters)
+- `getChatById` — Get chat with messages
+- `createChat` — Customer initiates a new chat
+- `closeChat` — Agent closes chat
+
+#### [NEW] [src/modules/chat/chat.service.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/chat/chat.service.js)
+- Business logic for chat CRUD, message creation
+- Company-scoped queries (multi-tenant isolation)
+
+#### [NEW] [src/modules/chat/chat.routes.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/chat/chat.routes.js)
+- `GET /api/chats`
+- `GET /api/chats/:id`
+- `POST /api/chats`
+- `PUT /api/chats/:id/close`
+
+#### [NEW] [src/sockets/chatSocket.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/sockets/chatSocket.js)
+- Socket.io event handlers:
+  - `join_chat` — Agent/customer joins a chat room
+  - `send_message` — Save message to DB, broadcast to room via `receive_message`
+  - `typing` — Broadcast typing indicator
+  - `chat_closed` — Notify room participants
+
+---
+
+### Utilities
+
+---
+
+#### [NEW] [src/utils/apiResponse.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/utils/apiResponse.js)
+- Standardized API response helpers: `success()`, `error()`, `paginated()`
+
+#### [NEW] [src/utils/validators.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/utils/validators.js)
+- Input validation helpers for email, password strength, UUIDs
+
+---
+
+## Phase 2: AI + Tickets
+
+### AI Module
+
+---
+
+#### [NEW] [src/modules/ai/ai.service.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ai/ai.service.js)
+- `generateReply(message)` — Call Ollama for reply suggestion
+- `summarizeChat(messages[])` — Summarize conversation
+- `detectSentiment(message)` — Classify as angry/neutral/happy
+- `classifyIssue(message)` — Classify as billing/technical/general/account
+- Graceful fallback if Ollama is unavailable
+- Log all AI interactions to `AILog` model
+
+#### [NEW] [src/modules/ai/ai.controller.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ai/ai.controller.js)
+- `getSuggestion` — Get AI reply suggestion for a message
+- `getSummary` — Get chat summary
+- `getSentiment` — Analyze message sentiment
+- `getClassification` — Classify issue type
+
+#### [NEW] [src/modules/ai/ai.routes.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ai/ai.routes.js)
+- `POST /api/ai/suggest` (protected)
+- `POST /api/ai/summarize` (protected)
+- `POST /api/ai/sentiment` (protected)
+- `POST /api/ai/classify` (protected)
+
+#### [NEW] [src/modules/ai/prompts.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ai/prompts.js)
+- Template functions for each AI prompt type
+- Clean prompt formatting with context injection
+
+---
+
+### Ticket Module
+
+---
+
+#### [NEW] [src/modules/ticket/ticket.controller.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ticket/ticket.controller.js)
+- `createTicket` — Create ticket from chat
+- `getTickets` — List tickets (with filters: status, priority, assignee)
+- `updateTicket` — Update status, priority, assignment
+- `getTicketStats` — Dashboard stats (open/resolved counts)
+
+#### [NEW] [src/modules/ticket/ticket.service.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ticket/ticket.service.js)
+- Business logic for ticket management
+- Auto-create ticket when chat opens
+- Company-scoped queries
+
+#### [NEW] [src/modules/ticket/ticket.routes.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/ticket/ticket.routes.js)
+- `POST /api/tickets`
+- `GET /api/tickets`
+- `PUT /api/tickets/:id`
+- `GET /api/tickets/stats`
+
+---
+
+### Socket Enhancement (Phase 2)
+
+---
+
+#### [MODIFY] [chatSocket.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/sockets/chatSocket.js)
+- Add `ai_suggestion` event: When customer sends message, auto-trigger AI suggestion and emit to agent
+- Integrate sentiment detection on incoming messages
+
+---
+
+## Phase 3: Analytics + Polish
+
+### Notification Module
+
+---
+
+#### [NEW] [src/modules/notification/notification.service.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/notification/notification.service.js)
+- In-app notification system for new chats, high-priority tickets
+- Socket-based real-time notifications
+
+---
+
+### Analytics Endpoints
+
+---
+
+#### [NEW] [src/modules/analytics/analytics.controller.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/analytics/analytics.controller.js)
+- `getSentimentTrends` — Sentiment distribution over time
+- `getTicketCategories` — Issue category breakdown
+- `getAgentPerformance` — Tickets resolved per agent
+- `getChatVolume` — Chat volume over time
+
+#### [NEW] [src/modules/analytics/analytics.routes.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/backend/src/modules/analytics/analytics.routes.js)
+- `GET /api/analytics/sentiment`
+- `GET /api/analytics/categories`
+- `GET /api/analytics/agents`
+- `GET /api/analytics/volume`
+
+---
+
+## Frontend (React + Tailwind CSS)
+
+### Setup
+
+---
+
+#### [NEW] Frontend Vite App
+- Created via `npx create-vite@latest ./ --template react`
+- Tailwind CSS v3 installed and configured
+- Dependencies: `axios`, `socket.io-client`, `react-router-dom`, `react-hot-toast`, `lucide-react`, `recharts` (for charts)
+
+---
+
+### Core Structure
+
+---
+
+#### [NEW] [src/context/AuthContext.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/context/AuthContext.jsx)
+- Auth state management (user, token, login, logout)
+- Persist token in localStorage
+- Axios interceptor for auth headers
+
+#### [NEW] [src/context/SocketContext.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/context/SocketContext.jsx)
+- Socket.io client connection management
+- Auto-connect on login, disconnect on logout
+
+#### [NEW] [src/services/api.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/services/api.js)
+- Axios instance with base URL and auth interceptor
+- API methods: `auth`, `chats`, `tickets`, `ai`, `users`, `analytics`
+
+#### [NEW] [src/hooks/useSocket.js](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/hooks/useSocket.js)
+- Custom hook for socket event listeners with cleanup
+
+---
+
+### Pages
+
+---
+
+#### [NEW] [src/pages/Login.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/Login.jsx)
+- Login form with email/password
+- Dark theme, gradient background, glass-morphism card
+- Error handling with toast notifications
+
+#### [NEW] [src/pages/Register.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/Register.jsx)
+- Registration form (company name, admin name, email, password)
+- Creates both company and admin user
+
+#### [NEW] [src/pages/Dashboard.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/Dashboard.jsx)
+- **Active chats list** with status indicators (open/closed, sentiment badges)
+- **Priority alerts** for high-priority tickets
+- **Quick stats**: Open chats, unresolved tickets, sentiment summary
+- Real-time updates via socket
+
+#### [NEW] [src/pages/ChatView.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/ChatView.jsx)
+- **Message thread** with sender indicators (customer/agent/ai)
+- **Message input** with send button
+- **AI Suggestions side panel** — shows suggested replies, one-click apply
+- **Chat info panel** — customer details, sentiment, ticket status
+- Real-time message updates via socket
+- Typing indicators
+
+#### [NEW] [src/pages/Tickets.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/Tickets.jsx)
+- Ticket list with filters (status, priority, assignee)
+- Ticket detail view with chat link
+- Assign/update ticket actions
+
+#### [NEW] [src/pages/Analytics.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/Analytics.jsx)
+- Sentiment trends chart (line/area chart)
+- Ticket categories pie chart
+- Agent performance bar chart
+- Chat volume over time
+
+#### [NEW] [src/pages/Settings.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/pages/Settings.jsx)
+- Manage agents (admin only)
+- Company settings
+
+---
+
+### Components
+
+---
+
+#### [NEW] [src/components/Layout.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/Layout.jsx)
+- Sidebar navigation with icons (Dashboard, Chats, Tickets, Analytics, Settings)
+- Top bar with user info and logout
+- Dark theme with gradient accents
+
+#### [NEW] [src/components/ChatList.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/ChatList.jsx)
+- Scrollable list of active chats
+- Status badges, last message preview, time
+
+#### [NEW] [src/components/MessageBubble.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/MessageBubble.jsx)
+- Styled message bubbles (different colors for customer/agent/ai)
+- Timestamp display
+
+#### [NEW] [src/components/AISuggestionPanel.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/AISuggestionPanel.jsx)
+- AI-generated reply suggestions
+- One-click "Use this reply" button
+- Summary and sentiment display
+
+#### [NEW] [src/components/TicketCard.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/TicketCard.jsx)
+- Ticket overview card with priority badge, status, assignee
+
+#### [NEW] [src/components/StatsCard.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/StatsCard.jsx)
+- Reusable stat display card with icon, label, value, trend indicator
+
+#### [NEW] [src/components/ProtectedRoute.jsx](file:///c:/Users/Arun/Desktop/Projects/ai-customer-support/frontend/src/components/ProtectedRoute.jsx)
+- Route guard component, redirects to login if unauthenticated
+
+---
+
+## Design System
+
+| Element | Style |
+|---------|-------|
+| **Theme** | Dark mode primary, with option for light |
+| **Primary Color** | Indigo/Violet gradient (`#6366f1` → `#8b5cf6`) |
+| **Accent** | Cyan (`#06b6d4`) for active states |
+| **Success** | Emerald (`#10b981`) |
+| **Warning** | Amber (`#f59e0b`) |
+| **Danger** | Rose (`#f43f5e`) |
+| **Background** | Slate-900 (`#0f172a`) |
+| **Cards** | Glass-morphism: `bg-white/5 backdrop-blur-xl border border-white/10` |
+| **Font** | Inter (Google Fonts) |
+| **Animations** | Fade-in, slide-up on mount; smooth hover transitions |
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **PostgreSQL credentials**: What are your local PostgreSQL credentials? I'll default to `postgres:postgres@localhost:5432/ai_support_db` — please confirm or provide alternatives.
+
+> [!IMPORTANT]
+> 2. **Ollama model**: Do you have Ollama installed with `llama3` or `mistral` pulled? The AI features need this. I'll default to `llama3` and add a fallback.
+
+> [!NOTE]
+> 3. **Customer-facing chat widget**: The spec focuses on the agent dashboard. Should I also build a simple customer-facing chat widget (embeddable) for Phase 1, or just simulate customer messages for now?
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Database connection and model sync verification
+- API endpoint testing via manual curl/Postman commands
+- Socket.io connection and event testing
+
+### Manual Verification
+- Start backend: `npm run dev` → verify API responds on `http://localhost:5000`
+- Start frontend: `npm run dev` → verify UI loads on `http://localhost:5173`
+- Register a company + admin user
+- Login and view dashboard
+- Create a chat and send messages in real-time
+- Verify AI suggestions appear (requires Ollama running)
+- Browser recording of full user flow
+
+### Build Verification
+- `npm run build` on frontend to verify production build succeeds
