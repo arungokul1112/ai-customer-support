@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { chatAPI, ticketAPI } from '../services/api';
+import { chatAPI, ticketAPI, aiAPI } from '../services/api';
 import { useSocketContext } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -11,8 +11,11 @@ const ChatView = () => {
   const [messages, setMessages] = useState([]);
   const [inputMsg, setInputMsg] = useState('');
   const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [sentiment, setSentiment] = useState('neutral');
   const [filter, setFilter] = useState('open'); // 'open' or 'closed'
+  const [ticketForm, setTicketForm] = useState({ priority: '', status: '', category: '' });
   
   const { user } = useAuth();
   const { socket } = useSocketContext();
@@ -57,15 +60,17 @@ const ChatView = () => {
       }
     };
 
-    const handleAiSuggestion = ({ chatId, suggestion, sentiment }) => {
+    const handleAiSuggestion = ({ chatId, suggestion, sentiment, category, priority }) => {
       if (activeChat && chatId === activeChat.id) {
         setAiSuggestion(suggestion);
         setSentiment(sentiment);
-        toast('New AI Suggestion!', { icon: '🤖' });
+        if (category) setTicketForm(prev => ({ ...prev, category }));
+        if (priority) setTicketForm(prev => ({ ...prev, priority }));
+        toast('AI Suggested Updates!', { icon: '🤖' });
       }
     };
 
-    const handleChatUpdated = ({ chatId, sentiment, lastAISuggestion, status }) => {
+    const handleChatUpdated = ({ chatId, sentiment, lastAISuggestion, status, category, priority }) => {
       // Update the chat in the list if it matches the current filter
       setChats((prev) => {
         const index = prev.findIndex(c => c.id === chatId);
@@ -73,7 +78,13 @@ const ChatView = () => {
           return prev.filter(c => c.id !== chatId);
         }
         if (index !== -1) {
-          return prev.map(c => c.id === chatId ? { ...c, sentiment, lastAISuggestion, status: status || c.status } : c);
+          return prev.map(c => {
+            if (c.id === chatId) {
+              const updatedTicket = c.Ticket ? { ...c.Ticket, category: category || c.Ticket.category, priority: priority || c.Ticket.priority } : null;
+              return { ...c, sentiment, lastAISuggestion, status: status || c.status, Ticket: updatedTicket };
+            }
+            return c;
+          });
         }
         return prev;
       });
@@ -82,6 +93,13 @@ const ChatView = () => {
         setSentiment(sentiment);
         setAiSuggestion(lastAISuggestion);
         if (status) setActiveChat(prev => ({ ...prev, status }));
+        if (category || priority) {
+          setTicketForm(prev => ({
+            ...prev,
+            category: category || prev.category,
+            priority: priority || prev.priority
+          }));
+        }
       }
 
       if (sentiment === 'angry') {
@@ -117,7 +135,13 @@ const ChatView = () => {
     try {
       setActiveChat(chat);
       setAiSuggestion(chat.lastAISuggestion || null);
+      setAiSummary(null);
       setSentiment(chat.sentiment || 'neutral');
+      setTicketForm({
+        priority: chat.Ticket?.priority || 'medium',
+        status: chat.Ticket?.status || 'open',
+        category: chat.Ticket?.category || 'general'
+      });
       const res = await chatAPI.getChatById(chat.id);
       setMessages(res.data.data.Messages || []);
       if (socket) {
@@ -173,10 +197,10 @@ const ChatView = () => {
     if (aiSuggestion) setInputMsg(aiSuggestion);
   };
 
-  const updateTicket = async (updates) => {
+  const updateTicket = async () => {
     if (!activeChat || !activeChat.Ticket) return;
     try {
-      const res = await ticketAPI.updateTicket(activeChat.Ticket.id, updates);
+      const res = await ticketAPI.updateTicket(activeChat.Ticket.id, ticketForm);
       const updatedTicket = res.data.data;
       setActiveChat({ ...activeChat, Ticket: updatedTicket });
       setChats(chats.map(c => c.id === activeChat.id ? { ...c, Ticket: updatedTicket } : c));
@@ -199,51 +223,72 @@ const ChatView = () => {
     }
   };
 
+  const generateSummary = async () => {
+    if (!activeChat) return;
+    try {
+      setIsSummarizing(true);
+      const res = await aiAPI.getSummary(activeChat.id);
+      setAiSummary(res.data.data.summary);
+      toast.success('Summary Generated');
+    } catch (err) {
+      toast.error('Failed to generate summary');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   return (
     <div className="flex h-full w-full bg-slate-900 overflow-hidden">
       
       {/* 1. Chat List Sidebar */}
-      <div className="w-1/4 border-r border-slate-700/50 flex flex-col bg-slate-800/30">
-        <div className="p-4 border-b border-slate-700/50 flex justify-between items-center">
-          <h2 className="font-bold text-slate-100">Conversations</h2>
-          <button onClick={createSimulatedChat} className="bg-primary/20 text-primary hover:bg-primary/30 p-2 rounded-full cursor-pointer transition-colors" title="Create Dummy Chat">
-            <Plus size={18} />
+      <div className="w-1/4 border-r border-slate-700/30 flex flex-col bg-slate-900/40 backdrop-blur-md">
+        <div className="p-5 border-b border-slate-700/30 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gradient">Messages</h2>
+          <button onClick={createSimulatedChat} className="bg-primary/10 text-primary hover:bg-primary/20 p-2.5 rounded-xl cursor-pointer transition-all hover:rotate-90" title="New Session">
+            <Plus size={20} />
           </button>
         </div>
         
         {/* Tabs */}
-        <div className="flex p-2 gap-2 bg-slate-900/50">
+        <div className="flex p-3 gap-2 bg-slate-900/20">
            <button 
              onClick={() => setFilter('open')}
-             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'open' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-slate-200'}`}
+             className={`flex-1 py-2 text-xs font-black rounded-xl transition-all tracking-widest ${filter === 'open' ? 'bg-primary text-white shadow-lg glow-primary' : 'text-slate-500 hover:text-slate-300'}`}
            >
              ACTIVE
            </button>
            <button 
              onClick={() => setFilter('closed')}
-             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${filter === 'closed' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+             className={`flex-1 py-2 text-xs font-black rounded-xl transition-all tracking-widest ${filter === 'closed' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
            >
              RESOLVED
            </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto w-full p-2 space-y-2">
+        <div className="flex-1 overflow-y-auto w-full p-3 space-y-3 scrollbar-hide">
           {chats.length === 0 && (
-            <p className="text-slate-400 p-4 text-center text-sm">
-              No {filter === 'open' ? 'active' : 'resolved'} chats found.
-            </p>
+            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
+               <MessageSquare size={32} className="mb-2 opacity-20" />
+               <p className="text-sm italic">No conversations yet</p>
+            </div>
           )}
           {chats.map(c => (
             <div 
               key={c.id} 
               onClick={() => selectChat(c)}
-              className={`p-3 rounded-xl cursor-pointer transition-all border ${activeChat?.id === c.id ? 'bg-slate-800 border-slate-700 shadow-lg' : 'border-transparent hover:bg-slate-800/50'}`}
+              className={`p-4 rounded-2xl cursor-pointer transition-all border group relative overflow-hidden ${activeChat?.id === c.id ? 'bg-slate-800/80 border-slate-600 shadow-2xl glow-primary' : 'border-transparent hover:bg-slate-800/40 hover:border-slate-700/50'}`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-semibold text-slate-100 truncate">{c.customerName}</span>
-                <span className={`w-2 h-2 rounded-full ${c.sentiment === 'angry' ? 'bg-rose-500' : c.sentiment === 'happy' ? 'bg-emerald-500' : 'bg-slate-500'}`}></span>
+                <span className={`font-bold transition-colors ${activeChat?.id === c.id ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>{c.customerName}</span>
+                <span className={`w-2.5 h-2.5 rounded-full ring-4 ring-slate-900/50 ${c.sentiment === 'angry' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]' : c.sentiment === 'happy' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-500'}`}></span>
               </div>
-              <p className="text-xs text-slate-400">{c.status === 'open' ? 'Active' : 'Resolved'}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] uppercase font-black tracking-tighter text-slate-500 group-hover:text-slate-400">
+                  {c.Ticket?.category || 'General'} • {c.Ticket?.priority || 'Medium'}
+                </p>
+                <p className="text-[10px] text-slate-600">{new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+              {activeChat?.id === c.id && <div className="absolute left-0 top-0 w-1 h-full bg-primary"></div>}
             </div>
           ))}
         </div>
@@ -253,166 +298,266 @@ const ChatView = () => {
       <div className="flex-1 flex flex-col h-full bg-slate-900 relative">
         {activeChat ? (
           <>
-            <div className="px-6 py-4 border-b border-slate-700/50 glass-card rounded-none flex justify-between items-center shadow-sm z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center">
-                   <UserIcon size={20} />
+            <div className="px-8 py-5 border-b border-slate-700/30 bg-slate-900/60 backdrop-blur-xl flex justify-between items-center z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 text-primary flex items-center justify-center shadow-inner border border-white/5">
+                   <UserIcon size={24} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white tracking-wide">{activeChat.customerName}</h3>
-                  <div className="flex items-center gap-2 text-xs font-semibold">
-                     <span className={`px-2 py-0.5 rounded-md text-white shadow-sm ${sentiment === 'angry' ? 'bg-rose-500/80 shadow-rose-900' : sentiment === 'happy' ? 'bg-emerald-500/80 shadow-emerald-900' : 'bg-slate-500/80'}`}>
-                       {sentiment.toUpperCase()}
+                  <h3 className="text-lg font-black text-white tracking-tight">{activeChat.customerName}</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-widest text-white uppercase shadow-lg ${sentiment === 'angry' ? 'bg-rose-500 glow-rose' : sentiment === 'happy' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-slate-600'}`}>
+                       {sentiment}
                      </span>
                      {activeChat.status === 'closed' && (
-                       <span className="bg-slate-700 px-2 py-0.5 rounded-md text-slate-300 border border-slate-600">RESOLVED</span>
+                       <span className="bg-slate-800/80 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-widest text-slate-400 border border-slate-700 uppercase">RESOLVED</span>
                      )}
+                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 {activeChat.status === 'open' && (
                   <>
                     <button 
                       onClick={simulateCustomerMessage} 
-                      className="bg-amber-500/20 text-amber-300 border border-amber-500/50 px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-500/30 transition-colors shadow-[0_0_10px_rgba(245,158,11,0.1)]"
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
                     >
-                      Simulate Reply
+                      Simulate
                     </button>
                     <button 
                       onClick={closeActiveChat}
-                      className="bg-rose-500/20 text-rose-300 border border-rose-500/50 px-4 py-2 rounded-lg text-sm font-medium hover:bg-rose-500/30 transition-colors"
+                      className="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all active:scale-95"
                     >
-                      Close Chat
+                      Resolve
                     </button>
                   </>
                 )}
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-900/80">
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
               {messages.length === 0 && (
-                <div className="flex h-full items-center justify-center text-slate-500">No messages yet. Waiting for customer...</div>
+                <div className="flex flex-col h-full items-center justify-center text-slate-600 gap-4">
+                   <Bot size={48} className="animate-pulse-soft opacity-20" />
+                   <p className="text-sm italic">Secure channel established. Waiting for message...</p>
+                </div>
               )}
               {messages.map((m, i) => (
-                <div key={m.id || i} className={`max-w-[70%] rounded-2xl px-5 py-3 shadow-md ${m.senderType === 'agent' ? 'ml-auto bg-gradient-to-r from-primary to-primary-light text-white rounded-br-none' : m.senderType === 'customer' ? 'mr-auto bg-slate-800 text-slate-100 border border-slate-700 rounded-bl-none' : 'mr-auto bg-slate-700 text-slate-300 font-mono text-sm'}`}>
-                  <p className="whitespace-pre-wrap leading-relaxed">{m.message}</p>
+                <div key={m.id || i} className={`flex flex-col ${m.senderType === 'agent' ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[75%] rounded-3xl px-6 py-4 shadow-2xl transition-all hover:scale-[1.01] ${m.senderType === 'agent' ? 'bg-gradient-to-br from-primary to-primary-light text-white rounded-br-none shadow-primary/20' : m.senderType === 'customer' ? 'bg-slate-800 text-slate-100 border border-slate-700/50 rounded-bl-none' : 'bg-slate-700/50 text-slate-300 font-mono text-xs italic rounded-2xl'}`}>
+                    <p className="whitespace-pre-wrap leading-relaxed font-medium">{m.message}</p>
+                  </div>
+                  <span className="text-[10px] text-slate-600 mt-2 px-2 font-bold uppercase tracking-widest">
+                    {m.senderType} • {new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               ))}
               <div ref={messagesEndRef} />
             </div>
             
-            <div className="p-4 border-t border-slate-700/50 bg-slate-800/80 backdrop-blur-md">
+            <div className="p-6 border-t border-slate-700/30 bg-slate-900/80 backdrop-blur-2xl">
               {activeChat.status === 'open' ? (
-                <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto items-end relative">
-                  <textarea 
-                    className="flex-1 glass-input min-h-[60px] resize-none pb-2 pt-3 shadow-inner bg-slate-900/90 text-slate-100 placeholder:text-slate-500" 
-                    placeholder="Type a message to the customer..."
-                    value={inputMsg}
-                    onChange={(e) => setInputMsg(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
-                  />
-                  <button type="submit" disabled={!inputMsg.trim()} className="btn-primary h-[60px] w-[60px] flex items-center justify-center rounded-xl shadow-lg shadow-primary/20">
-                    <Send size={20} className="ml-1" />
+                <form onSubmit={sendMessage} className="flex gap-4 max-w-5xl mx-auto items-end relative group">
+                  <div className="flex-1 relative">
+                    <textarea 
+                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl px-6 py-4 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all min-h-[60px] resize-none shadow-inner" 
+                      placeholder="Secure message to client..."
+                      value={inputMsg}
+                      onChange={(e) => setInputMsg(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
+                    />
+                    <div className="absolute right-4 bottom-3 text-[10px] font-bold text-slate-600 pointer-events-none">ENTER TO SEND</div>
+                  </div>
+                  <button type="submit" disabled={!inputMsg.trim()} className="h-[60px] w-[60px] flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-light text-white shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all transition-transform">
+                    <Send size={24} className="ml-1" />
                   </button>
                 </form>
               ) : (
-                <div className="max-w-4xl mx-auto p-4 bg-slate-900/50 rounded-xl border border-slate-700 text-center text-slate-400 text-sm italic">
-                  This conversation has been resolved and is now read-only.
+                <div className="max-w-4xl mx-auto p-6 bg-slate-800/30 rounded-2xl border border-slate-700/50 text-center flex flex-col items-center gap-2">
+                  <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-[0.2em] mb-1">Archived Session</span>
+                  <p className="text-slate-400 text-sm italic font-medium">This conversation was marked as resolved. Re-open via customer message.</p>
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div className="h-full flex items-center justify-center text-slate-500">
-            Select a conversation to start chatting
+          <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-6">
+            <div className="w-32 h-32 rounded-full bg-slate-800/30 flex items-center justify-center border border-slate-700/30 animate-pulse-soft">
+              <MessageSquare size={48} className="opacity-10" />
+            </div>
+            <p className="text-lg font-black tracking-widest text-slate-700 uppercase">Select a Channel to begin</p>
           </div>
         )}
       </div>
       
       {/* 3. AI Copilot Sidebar */}
-      <div className="w-[300px] border-l border-slate-700/50 flex flex-col bg-slate-800/20 backdrop-blur-sm z-20 shadow-[-10px_0_20px_rgba(0,0,0,0.1)]">
-        <div className="p-4 border-b border-slate-700/50 flex items-center gap-2">
-          <Bot className="text-primary-light" size={20} />
-          <h2 className="font-bold text-slate-100">AI Copilot</h2>
+      <div className="w-[320px] border-l border-slate-700/30 flex flex-col bg-slate-900/60 backdrop-blur-2xl z-20 shadow-[-20px_0_40px_rgba(0,0,0,0.3)]">
+        <div className="p-6 border-b border-slate-700/30 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary-light shadow-inner">
+            <Bot size={24} className="animate-pulse-soft" />
+          </div>
+          <div>
+            <h2 className="font-black text-white uppercase tracking-[0.2em] text-xs">AI Copilot</h2>
+            <div className="flex items-center gap-1.5 mt-0.5">
+               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+               <span className="text-[8px] font-black text-slate-500 uppercase">Neural Link Active</span>
+            </div>
+          </div>
         </div>
         
-        <div className="flex-1 p-4 overflow-y-auto space-y-6">
+        <div className="flex-1 p-5 overflow-y-auto space-y-6 scrollbar-hide">
           {activeChat ? (
-            <div className="space-y-6">
-              <div className="glass-card p-4 rounded-xl shadow-md border border-slate-700/50">
-                <h3 className="font-bold text-sm text-slate-300 mb-3 flex items-center gap-2"><AlertCircle size={14}/> Detect Sentiment</h3>
-                <div className={`p-3 rounded-lg flex items-center justify-center font-bold tracking-wider ${sentiment === 'angry' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : sentiment === 'happy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                  {sentiment.charAt(0).toUpperCase() + sentiment.slice(1)}
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+              
+              {/* Sentiment Card */}
+              <div className="glass-card p-5 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <AlertCircle size={64} />
+                </div>
+                <h3 className="font-black text-[10px] text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                   Live Sentiment
+                </h3>
+                <div className={`p-4 rounded-xl flex items-center justify-center font-black text-lg tracking-[0.1em] border uppercase transition-all ${sentiment === 'angry' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 glow-rose' : sentiment === 'happy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                  {sentiment}
                 </div>
               </div>
 
               {/* Ticket Management Section */}
-              <div className="glass-card p-4 rounded-xl shadow-md border border-slate-700/50 bg-slate-800/40">
-                <h3 className="font-bold text-sm text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-widest">
-                  <MessageSquare size={14}/> Ticket Info
-                </h3>
+              <div className="glass-card p-5 rounded-2xl bg-slate-800/40 relative group">
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="font-black text-[10px] text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    Classification
+                  </h3>
+                  <button 
+                    onClick={updateTicket}
+                    className="text-[9px] font-black text-primary-light hover:text-white uppercase tracking-tighter bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 transition-all active:scale-95"
+                  >
+                    Commit
+                  </button>
+                </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Priority</label>
-                    <select 
-                      value={activeChat.Ticket?.priority || 'medium'}
-                      onChange={(e) => updateTicket({ priority: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
+                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block px-1">Priority Level</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['low', 'medium', 'high'].map(p => (
+                        <button 
+                          key={p}
+                          onClick={() => setTicketForm({ ...ticketForm, priority: p })}
+                          className={`py-2 text-[9px] font-black uppercase rounded-lg border transition-all ${ticketForm.priority === p ? 'bg-primary border-primary text-white shadow-lg glow-primary' : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'}`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Status</label>
+                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block px-1">Issue Status</label>
                     <select 
-                      value={activeChat.Ticket?.status || 'open'}
-                      onChange={(e) => updateTicket({ status: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary"
+                      value={ticketForm.status}
+                      onChange={(e) => setTicketForm({ ...ticketForm, status: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
                     >
-                      <option value="open">Open</option>
-                      <option value="in_progress">In Progress</option>
+                      <option value="open">Open Session</option>
+                      <option value="in_progress">In Analysis</option>
                       <option value="resolved">Resolved</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Category</label>
-                    <input 
-                      type="text"
-                      value={activeChat.Ticket?.category || 'general'}
-                      onChange={(e) => updateTicket({ category: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
+                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block px-1">Category Tag</label>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        value={ticketForm.category}
+                        onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+                        placeholder="e.g. BILLING"
+                      />
+                      <Plus size={14} className="absolute right-4 top-3.5 text-slate-600" />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="glass-card p-4 rounded-xl shadow-lg border border-slate-700/50 relative overflow-hidden group">
+              {/* AI Summary Card */}
+              <div className="glass-card p-5 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 group-hover:w-2 transition-all"></div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-black text-[10px] text-slate-500 uppercase tracking-widest">Neural Summary</h3>
+                  <button 
+                    type="button"
+                    onClick={generateSummary}
+                    disabled={isSummarizing}
+                    className="text-[9px] font-black text-amber-500 hover:text-amber-400 uppercase tracking-widest disabled:opacity-50 transition-colors"
+                  >
+                    {isSummarizing ? 'Processing...' : 'Refresh'}
+                  </button>
+                </div>
+                {aiSummary ? (
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium italic opacity-90">"{aiSummary}"</p>
+                ) : (
+                  <button 
+                    type="button"
+                    onClick={generateSummary}
+                    disabled={isSummarizing}
+                    className="w-full py-4 border-2 border-dashed border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-400 hover:border-slate-700 transition-all"
+                  >
+                    {isSummarizing ? 'Connecting...' : 'Generate Insights'}
+                  </button>
+                )}
+              </div>
+
+              {/* Smart Suggestion Card */}
+              <div className="glass-card p-5 rounded-2xl relative overflow-hidden group border-primary/20 glow-primary">
                 <div className="absolute top-0 left-0 w-1 h-full bg-primary group-hover:w-2 transition-all"></div>
-                <h3 className="font-bold text-sm text-slate-300 mb-2">Smart Suggestion</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-black text-[10px] text-primary-light uppercase tracking-widest">Smart Suggestion</h3>
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      if (!activeChat || messages.length === 0) return;
+                      try {
+                        const lastMsg = [...messages].reverse().find(m => m.senderType === 'customer');
+                        if (!lastMsg) return toast.error('No customer message to reply to');
+                        const res = await aiAPI.getSuggestion(activeChat.id, lastMsg.message);
+                        setAiSuggestion(res.data.data.suggestion);
+                        toast.success('Reply recalibrated');
+                      } catch (err) {
+                        toast.error('Neural link failure');
+                      }
+                    }}
+                    className="text-[9px] font-black text-slate-500 hover:text-primary-light uppercase tracking-widest transition-colors"
+                  >
+                    Regenerate
+                  </button>
+                </div>
                 {aiSuggestion ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-slate-100 italic leading-relaxed">"{aiSuggestion}"</p>
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-100 font-medium leading-relaxed italic border-l-2 border-primary/30 pl-4 py-1">"{aiSuggestion}"</p>
                     <button 
                       onClick={applySuggestion}
-                      className="w-full bg-primary/20 hover:bg-primary/30 text-primary-light py-2 rounded-lg text-xs font-bold transition-colors border border-primary/20"
+                      className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-primary/20 active:scale-95"
                     >
-                      APPLY REPLY
+                      Use Intel
                     </button>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 italic">Waiting for customer message...</p>
+                  <div className="flex flex-col items-center py-4 gap-2 opacity-30">
+                    <Bot size={24} className="text-slate-600" />
+                    <p className="text-[10px] font-black uppercase text-slate-600">Awaiting Input</p>
+                  </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-center text-slate-500 text-sm p-4">
-              Select a chat to see AI insights
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 gap-4">
+               <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-800 flex items-center justify-center">
+                  <Bot size={32} className="text-slate-800" />
+               </div>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-700">Neural insights available upon selection</p>
             </div>
           )}
         </div>

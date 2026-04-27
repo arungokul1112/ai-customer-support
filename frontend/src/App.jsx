@@ -12,6 +12,9 @@ import ChatView from './pages/ChatView';
 import Tickets from './pages/Tickets';
 import CustomerWidget from './pages/CustomerWidget';
 
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
+
 function App() {
   return (
     <AuthProvider>
@@ -32,8 +35,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/chats" element={<ChatView />} />
               <Route path="/tickets" element={<Tickets />} />
-              <Route path="/analytics" element={<div className="p-8 text-2xl font-bold">Analytics Module Coming Soon</div>} />
-              <Route path="/settings" element={<div className="p-8 text-2xl font-bold">Settings Component Coming Soon</div>} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/customer" element={<CustomerWidget />} />
             </Route>
           </Routes>
