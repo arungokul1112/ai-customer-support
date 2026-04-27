@@ -30,12 +30,20 @@ const initChatSocket = (io) => {
 
             const sentiment = await aiService.detectSentiment(chatId, message);
             const suggestion = await aiService.generateReply(chatId, message, history, sentiment);
+            const category = await aiService.classifyIssue(chatId, message);
 
-            // Reopen if closed
+            // Reopen if closed and update ticket details
             const updates = { sentiment, lastAISuggestion: suggestion };
+            
+            // Ticket updates based on AI
+            const ticketUpdates = { category };
+            if (sentiment === 'angry') {
+              ticketUpdates.priority = 'high';
+            }
+
             if (chat.status === 'closed') {
               updates.status = 'open';
-              await Ticket.update({ status: 'open' }, { where: { chatId } });
+              ticketUpdates.status = 'open';
               
               // Notify agents of reopening
               io.to(`company_${chat.companyId}`).emit('notification', { 
@@ -44,17 +52,29 @@ const initChatSocket = (io) => {
               });
             }
 
+            await Ticket.update(ticketUpdates, { where: { chatId } });
             await chat.update(updates);
 
+            // Fetch updated ticket to emit
+            const updatedTicket = await Ticket.findOne({ where: { chatId } });
+
             // Notify open chat room
-            io.to(`chat_${chatId}`).emit('ai_suggestion', { chatId, suggestion, sentiment });
+            io.to(`chat_${chatId}`).emit('ai_suggestion', { 
+              chatId, 
+              suggestion, 
+              sentiment,
+              category,
+              priority: ticketUpdates.priority || updatedTicket.priority
+            });
 
             // Notify company room for background/sidebar updates
             io.to(`company_${chat.companyId}`).emit('chat_updated', { 
               chatId, 
               sentiment, 
               lastAISuggestion: suggestion,
-              status: updates.status || chat.status
+              status: updates.status || chat.status,
+              category,
+              priority: ticketUpdates.priority || updatedTicket.priority
             });
           } catch (aiErr) {
             console.warn('AI processing error:', aiErr.message);

@@ -47,6 +47,9 @@ export const userAPI = {
 
 export const aiAPI = {
   getSummary: (chatId) => api.post('/ai/summarize', { chatId }),
+  getSuggestion: (chatId, message) => api.post('/ai/suggest', { chatId, message }),
+  getSentiment: (chatId, message) => api.post('/ai/sentiment', { chatId, message }),
+  getClassification: (chatId, message) => api.post('/ai/classify', { chatId, message }),
 };
 
 export default api;
