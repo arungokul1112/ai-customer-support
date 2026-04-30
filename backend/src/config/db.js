@@ -1,9 +1,16 @@
 const { Sequelize } = require('sequelize');
 
-const sequelize = process.env.DATABASE_URL
-  ? new Sequelize(process.env.DATABASE_URL, {
+const isProduction = process.env.NODE_ENV === 'production';
+const databaseUrl = process.env.DATABASE_URL;
+
+if (isProduction && !databaseUrl) {
+  console.warn('⚠️ WARNING: Running in production but DATABASE_URL is not set. Falling back to manual config.');
+}
+
+const sequelize = databaseUrl
+  ? new Sequelize(databaseUrl, {
       dialect: 'postgres',
-      logging: process.env.NODE_ENV === 'development' ? console.log : false,
+      logging: !isProduction ? console.log : false,
       dialectOptions: {
         ssl: {
           require: true,
@@ -19,7 +26,7 @@ const sequelize = process.env.DATABASE_URL
         host: process.env.DB_HOST || 'localhost',
         port: process.env.DB_PORT || 5432,
         dialect: 'postgres',
-        logging: process.env.NODE_ENV === 'development' ? console.log : false,
+        logging: !isProduction ? console.log : false,
         pool: {
           max: 10,
           min: 0,
@@ -28,6 +35,8 @@ const sequelize = process.env.DATABASE_URL
         },
       }
     );
+
+console.log(`📡 Database connection mode: ${databaseUrl ? 'DATABASE_URL' : 'Manual Host/Port'}`);
 
 const connectDB = async () => {
   try {
