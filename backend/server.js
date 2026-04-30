@@ -21,6 +21,11 @@ sequelize
     });
   })
   .catch((err) => {
-    console.error('❌ Failed to sync database:', err);
+    console.error('❌ Failed to sync database!');
+    console.error('Error Name:', err.name);
+    console.error('Error Message:', err.message);
+    if (err.parent) {
+      console.error('Parent Error:', err.parent.message);
+    }
     process.exit(1);
   });
