@@ -147,33 +147,7 @@ const ChatView = () => {
     }
   };
 
-  const createSimulatedChat = async () => {
-    try {
-      const res = await chatAPI.createChat({ 
-        customerName: 'Premium Customer', 
-        customerEmail: 'vip@customer.com' 
-      });
-      const newChat = res.data.data;
-      setChats([newChat, ...chats]);
-      selectChat(newChat);
-      toast.success('New session created');
-    } catch (err) {
-      toast.error('Failed to create chat');
-    }
-  };
 
-  const simulateCustomerMessage = async () => {
-    if (!activeChat) return;
-    const msg = "I'm having a serious issue with my account billing. Please help me resolve this as soon as possible!";
-    if (socket) {
-      socket.emit('send_message', {
-        chatId: activeChat.id,
-        companyId: user.companyId,
-        message: msg,
-        senderType: 'customer'
-      });
-    }
-  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -239,9 +213,6 @@ const ChatView = () => {
       <div className="w-[260px] border-r border-slate-200 dark:border-brand-border-dark flex flex-col bg-slate-50/50 dark:bg-brand-surface-dark/20">
         <div className="p-4 border-b border-slate-200 dark:border-brand-border-dark flex justify-between items-center bg-white dark:bg-brand-surface-dark">
           <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Inbox</h2>
-          <button onClick={createSimulatedChat} className="p-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-xl transition-all" title="New Session">
-            <Plus size={18} />
-          </button>
         </div>
         
         {/* Tabs */}
@@ -311,20 +282,12 @@ const ChatView = () => {
               </div>
               <div className="flex gap-2">
                 {activeChat.status === 'open' && (
-                  <>
-                    <button 
-                      onClick={simulateCustomerMessage} 
-                      className="btn-secondary py-1.5 px-4 text-[10px]"
-                    >
-                      Simulate
-                    </button>
-                    <button 
-                      onClick={closeActiveChat}
-                      className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-1.5 px-4 rounded-xl text-[10px] transition-all"
-                    >
-                      Resolve
-                    </button>
-                  </>
+                  <button 
+                    onClick={closeActiveChat}
+                    className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-1.5 px-4 rounded-xl text-[10px] transition-all"
+                  >
+                    Resolve
+                  </button>
                 )}
               </div>
             </div>
