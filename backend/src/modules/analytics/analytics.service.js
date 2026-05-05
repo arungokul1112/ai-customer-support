@@ -1,4 +1,4 @@
-const { Message, Chat, Ticket, AILog } = require('../../models');
+const { Message, Chat, Ticket, AILog, User } = require('../../models');
 const { Op, fn, col, literal } = require('sequelize');
 
 const getSentimentTrends = async (companyId) => {
@@ -20,17 +20,25 @@ const getTicketCategories = async (companyId) => {
 };
 
 const getAgentPerformance = async (companyId) => {
-  const tickets = await Ticket.findAll({
-    where: { companyId, status: 'resolved', assignedTo: { [Op.ne]: null } },
-    attributes: ['assignedTo', [fn('COUNT', col('Ticket.id')), 'resolved']],
-    include: [{ association: 'assignee', attributes: ['name'] }],
-    group: ['Ticket.assignedTo', 'assignee.id'],
+  const agents = await User.findAll({
+    where: { companyId, role: 'agent' },
+    attributes: ['id', 'name'],
+    include: [{
+      model: Ticket,
+      as: 'assignedTickets',
+      attributes: ['id', 'status'],
+      required: false
+    }],
   });
-  return tickets.map((t) => ({
-    agentId: t.assignedTo,
-    agentName: t.assignee?.name || 'Unknown',
-    resolved: parseInt(t.dataValues.resolved),
-  }));
+
+  return agents.map((agent) => {
+    const resolvedCount = agent.assignedTickets.filter(t => t.status === 'resolved').length;
+    return {
+      agentId: agent.id,
+      agentName: agent.name,
+      resolved: resolvedCount,
+    };
+  });
 };
 
 const getChatVolume = async (companyId) => {

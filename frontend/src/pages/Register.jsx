@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
-import { Bot } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -11,6 +11,7 @@ const Register = () => {
     email: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -34,83 +35,105 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/20 via-slate-900 to-slate-900 pointer-events-none"></div>
-      
-      <div className="w-full max-w-md p-8 glass-card rounded-2xl relative z-10">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 text-primary-light mb-4 shadow-[0_0_20px_rgba(99,102,241,0.3)]">
-            <Bot size={32} />
+    <div className="min-h-screen flex items-center justify-center bg-brand-surface-light dark:bg-brand-dark transition-colors p-4">
+      <div className="w-full max-w-[440px] space-y-8">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary-600 text-white mb-4 shadow-xl shadow-primary-500/20">
+            <Sparkles size={24} fill="currentColor" />
           </div>
-          <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
-          <p className="text-slate-400">Register your company</p>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Create workspace</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Get started with your AI-powered support suite</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Company Name</label>
-            <input
-              type="text"
-              name="companyName"
-              className="glass-input"
-              value={formData.companyName}
-              onChange={handleChange}
-              required
-            />
-          </div>
+        <div className="glass-card p-8 rounded-3xl">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Company Name</label>
+              <input
+                type="text"
+                name="companyName"
+                className="input-field"
+                value={formData.companyName}
+                onChange={handleChange}
+                placeholder="Acme Corp"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Admin Name</label>
-            <input
-              type="text"
-              name="name"
-              className="glass-input"
-              value={formData.name}
-              onChange={handleChange}
-              required
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Admin Identity</label>
+              <input
+                type="text"
+                name="name"
+                className="input-field"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Full Name"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Work Email</label>
-            <input
-              type="email"
-              name="email"
-              className="glass-input"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
-            <input
-              type="password"
-              name="password"
-              className="glass-input"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength="6"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Work Email</label>
+              <input
+                type="email"
+                name="email"
+                className="input-field"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="name@company.com"
+                required
+              />
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Access Key</label>
+              <div className="relative group">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  className="input-field pr-11"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  required
+                  minLength="6"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
 
-          <button
-            type="submit"
-            className="w-full btn-primary mt-2"
-            disabled={loading}
-          >
-            {loading ? 'Creating...' : 'Register Company'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="w-full btn-primary py-3 flex items-center justify-center gap-2 mt-4"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>Provisioning...</span>
+                </>
+              ) : (
+                'Register Company'
+              )}
+            </button>
+          </form>
 
-        <p className="mt-6 text-center text-slate-400 text-sm">
-          Already have an account?{' '}
-          <Link to="/login" className="text-primary-light hover:underline font-medium">
-            Sign In
-          </Link>
-        </p>
+          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-brand-border-dark">
+            <p className="text-center text-slate-500 dark:text-slate-400 text-xs">
+              Already have an account?{' '}
+              <Link to="/login" className="text-primary-600 dark:text-primary-400 hover:underline font-bold transition-all">
+                Sign In
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
