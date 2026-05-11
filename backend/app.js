@@ -15,12 +15,13 @@ const app = express();
 
 // Security & Middleware
 app.use(helmet());
+const normalizeOrigin = (value) => value.trim().replace(/\/$/, '');
 const allowedOrigins = process.env.CLIENT_URL
-  ? process.env.CLIENT_URL.split(',').map((url) => url.trim())
+  ? process.env.CLIENT_URL.split(',').map((url) => normalizeOrigin(url))
   : ['http://localhost:5173'];
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
       callback(null, true);
     } else {
       callback(new Error(`CORS blocked by server: origin ${origin} not allowed`));
