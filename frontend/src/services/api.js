@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+const apiBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+if (import.meta.env.MODE === 'production' && !import.meta.env.VITE_API_URL) {
+  console.warn(
+    'VITE_API_URL is not defined in production. The frontend will try to call localhost instead of the deployed backend.'
+  );
+}
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`,
+  baseURL: `${apiBaseURL}/api`,
 });
 
 api.interceptors.request.use((config) => {
