@@ -14,20 +14,31 @@ const analyticsRoutes = require('./src/modules/analytics/analytics.routes');
 const app = express();
 
 // Security & Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
 const normalizeOrigin = (value) => value.trim().replace(/\/$/, '');
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(',').map((url) => normalizeOrigin(url))
   : ['http://localhost:5173'];
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
     } else {
+      console.warn(`⚠️ CORS Blocked: Origin "${origin}" is not in allowed list:`, allowedOrigins);
       callback(new Error(`CORS blocked by server: origin ${origin} not allowed`));
     }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(morgan('dev'));
 app.use(express.json());
