@@ -4,7 +4,7 @@ import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
-import { BarChart3, TrendingUp, Users, PieChart as PieChartIcon, Loader2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, PieChart as PieChartIcon, Loader2, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Analytics = () => {
@@ -44,142 +44,133 @@ const Analytics = () => {
     fetchData();
   }, []);
 
-  const COLORS = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#06b6d4'];
+  const COLORS = ['#6366f1', '#14b8a6', '#f43f5e', '#f59e0b', '#06b6d4'];
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mx-auto mb-4" />
-          <p className="text-slate-400 font-medium">Crunching your data...</p>
-        </div>
+      <div className="h-full flex flex-col items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-primary-500" size={32} />
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Processing Neural Data</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-900 p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-4xl font-black text-white tracking-tight">System <span className="text-indigo-500">Analytics</span></h1>
-          <p className="text-slate-400 mt-2">Comprehensive overview of support performance and customer satisfaction.</p>
+    <div className="p-8 max-w-7xl mx-auto space-y-8 h-full transition-colors">
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} className="text-primary-600" />
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Intelligence Hub</h1>
+        </div>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Deep insight into support operations and customer experience</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* Sentiment Trends */}
+        <div className="glass-card rounded-[2rem] p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+             <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Sentiment Evolution</h3>
+             <span className="px-3 py-1 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 text-[10px] font-bold rounded-full uppercase">Neural Scan</span>
+          </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.sentiment}>
+                <defs>
+                  <linearGradient id="colorTeal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-100 dark:text-white/5" vertical={false} />
+                <XAxis dataKey="sentiment" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dx={-10} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'var(--tw-bg-opacity)', background: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: 'bold' }}
+                />
+                <Area type="monotone" dataKey="count" stroke="#6366f1" fillOpacity={1} fill="url(#colorTeal)" strokeWidth={3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Sentiment Trends */}
-          <div className="glass-card rounded-[2rem] p-8 border border-white/5">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                <TrendingUp size={20} />
-              </div>
-              <h3 className="text-xl font-bold text-white">Sentiment Trends</h3>
-            </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.sentiment}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis dataKey="sentiment" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
-                    itemStyle={{ color: '#fff' }}
-                  />
-                  <Area type="monotone" dataKey="count" stroke="#6366f1" fillOpacity={1} fill="url(#colorValue)" strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+        {/* Ticket Categories */}
+        <div className="glass-card rounded-[2rem] p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+             <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Context Allocation</h3>
+             <span className="px-3 py-1 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 text-[10px] font-bold rounded-full uppercase">Queue Stats</span>
           </div>
-
-          {/* Ticket Categories */}
-          <div className="glass-card rounded-[2rem] p-8 border border-white/5">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                <PieChartIcon size={20} />
-              </div>
-              <h3 className="text-xl font-bold text-white">Issue Classification</h3>
-            </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.categories}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="count"
-                    nameKey="category"
-                  >
-                    {data.categories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
-                  />
-                  <Legend verticalAlign="bottom" height={36}/>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data.categories}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={10}
+                  dataKey="count"
+                  nameKey="category"
+                  stroke="none"
+                >
+                  {data.categories.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ background: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: 'bold' }}
+                />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', paddingTop: '20px' }}/>
+              </PieChart>
+            </ResponsiveContainer>
           </div>
-
-          {/* Agent Performance */}
-          <div className="glass-card rounded-[2rem] p-8 border border-white/5">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400">
-                <Users size={20} />
-              </div>
-              <h3 className="text-xl font-bold text-white">Agent Throughput</h3>
-            </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.agents}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis dataKey="agentName" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    cursor={{fill: '#ffffff05'}}
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
-                  />
-                  <Bar dataKey="resolved" fill="#f43f5e" radius={[10, 10, 0, 0]} barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Chat Volume */}
-          <div className="glass-card rounded-[2rem] p-8 border border-white/5">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400">
-                <BarChart3 size={20} />
-              </div>
-              <h3 className="text-xl font-bold text-white">Engagement Volume</h3>
-            </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.volume}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
-                  />
-                  <Line type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={4} dot={{ r: 6, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 8 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
         </div>
+
+        {/* Agent Performance */}
+        <div className="glass-card rounded-[2rem] p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+             <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Unit Throughput</h3>
+             <span className="px-3 py-1 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 text-[10px] font-bold rounded-full uppercase">Active Ops</span>
+          </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.agents}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-100 dark:text-white/5" vertical={false} />
+                <XAxis dataKey="agentName" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dx={-10} />
+                <Tooltip 
+                  cursor={{fill: 'rgba(0,0,0,0.02)'}}
+                  contentStyle={{ background: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: 'bold' }}
+                />
+                <Bar dataKey="resolved" fill="#f43f5e" radius={[6, 6, 0, 0]} barSize={35} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Activity Volume */}
+        <div className="glass-card rounded-[2rem] p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+             <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">Activity Pulse</h3>
+             <span className="px-3 py-1 bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 text-[10px] font-bold rounded-full uppercase">Real-time</span>
+          </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.volume}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-100 dark:text-white/5" vertical={false} />
+                <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dx={-10} />
+                <Tooltip 
+                  contentStyle={{ background: 'rgba(255, 255, 255, 0.9)', border: 'none', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: 'bold' }}
+                />
+                <Line type="monotone" dataKey="count" stroke="#f59e0b" strokeWidth={4} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 8, stroke: '#fff', strokeWidth: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
       </div>
     </div>
   );

@@ -24,9 +24,12 @@ const verifyToken = async (req, res, next) => {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return error(res, 'Token expired', 401);
+      return error(res, 'Session expired. Please login again.', 401);
     }
-    return error(res, 'Invalid token', 401);
+    if (err.name === 'JsonWebTokenError') {
+      return error(res, 'Invalid authentication token.', 401);
+    }
+    return error(res, 'Authentication failed.', 401);
   }
 };
 

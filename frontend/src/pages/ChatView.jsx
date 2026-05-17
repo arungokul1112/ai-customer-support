@@ -3,7 +3,7 @@ import { chatAPI, ticketAPI, aiAPI } from '../services/api';
 import { useSocketContext } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Bot, Send, User as UserIcon, AlertCircle, Plus, MessageSquare } from 'lucide-react';
+import { Bot, Send, User as UserIcon, Plus, MessageSquare, Sparkles, AlertCircle } from 'lucide-react';
 
 const ChatView = () => {
   const [chats, setChats] = useState([]);
@@ -21,7 +21,6 @@ const ChatView = () => {
   const { socket } = useSocketContext();
   const messagesEndRef = useRef(null);
 
-  // Auto scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -30,7 +29,6 @@ const ChatView = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Fetch chats on mount and when filter changes
   useEffect(() => {
     const loadChats = async () => {
       try {
@@ -43,14 +41,12 @@ const ChatView = () => {
     loadChats();
   }, [filter]);
 
-  // Join company room for background updates
   useEffect(() => {
     if (socket && user?.companyId) {
       socket.emit('join_company', { companyId: user.companyId });
     }
   }, [socket, user]);
 
-  // Handle Socket events
   useEffect(() => {
     if (!socket) return;
     
@@ -71,7 +67,6 @@ const ChatView = () => {
     };
 
     const handleChatUpdated = ({ chatId, sentiment, lastAISuggestion, status, category, priority }) => {
-      // Update the chat in the list if it matches the current filter
       setChats((prev) => {
         const index = prev.findIndex(c => c.id === chatId);
         if (status && status !== filter) {
@@ -152,33 +147,7 @@ const ChatView = () => {
     }
   };
 
-  const createSimulatedChat = async () => {
-    try {
-      const res = await chatAPI.createChat({ 
-        customerName: 'Premium Customer', 
-        customerEmail: 'vip@customer.com' 
-      });
-      const newChat = res.data.data;
-      setChats([newChat, ...chats]);
-      selectChat(newChat);
-      toast.success('New session created');
-    } catch (err) {
-      toast.error('Failed to create chat');
-    }
-  };
 
-  const simulateCustomerMessage = async () => {
-    if (!activeChat) return;
-    const msg = "I'm having a serious issue with my account billing. Please help me resolve this fuck up as soon as possible!";
-    if (socket) {
-      socket.emit('send_message', {
-        chatId: activeChat.id,
-        companyId: user.companyId,
-        message: msg,
-        senderType: 'customer'
-      });
-    }
-  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -238,117 +207,104 @@ const ChatView = () => {
   };
 
   return (
-    <div className="flex h-full w-full bg-slate-900 overflow-hidden">
+    <div className="flex h-full w-full bg-white dark:bg-brand-dark overflow-hidden transition-colors">
       
       {/* 1. Chat List Sidebar */}
-      <div className="w-1/4 border-r border-slate-700/30 flex flex-col bg-slate-900/40 backdrop-blur-md">
-        <div className="p-5 border-b border-slate-700/30 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gradient">Messages</h2>
-          <button onClick={createSimulatedChat} className="bg-primary/10 text-primary hover:bg-primary/20 p-2.5 rounded-xl cursor-pointer transition-all hover:rotate-90" title="New Session">
-            <Plus size={20} />
-          </button>
+      <div className="w-[260px] border-r border-slate-200 dark:border-brand-border-dark flex flex-col bg-slate-50/50 dark:bg-brand-surface-dark/20">
+        <div className="p-4 border-b border-slate-200 dark:border-brand-border-dark flex justify-between items-center bg-white dark:bg-brand-surface-dark">
+          <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Inbox</h2>
         </div>
         
         {/* Tabs */}
-        <div className="flex p-3 gap-2 bg-slate-900/20">
+        <div className="flex p-1.5 bg-slate-100 dark:bg-black/20 m-3 rounded-2xl">
            <button 
              onClick={() => setFilter('open')}
-             className={`flex-1 py-2 text-xs font-black rounded-xl transition-all tracking-widest ${filter === 'open' ? 'bg-primary text-white shadow-lg glow-primary' : 'text-slate-500 hover:text-slate-300'}`}
+             className={`flex-1 py-1.5 text-[10px] font-bold rounded-xl transition-all ${filter === 'open' ? 'bg-white dark:bg-brand-surface-dark text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
            >
-             ACTIVE
+             Active
            </button>
            <button 
              onClick={() => setFilter('closed')}
-             className={`flex-1 py-2 text-xs font-black rounded-xl transition-all tracking-widest ${filter === 'closed' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+             className={`flex-1 py-1.5 text-[10px] font-bold rounded-xl transition-all ${filter === 'closed' ? 'bg-white dark:bg-brand-surface-dark text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
            >
-             RESOLVED
+             Resolved
            </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto w-full p-3 space-y-3 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
           {chats.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-40 text-slate-500">
-               <MessageSquare size={32} className="mb-2 opacity-20" />
-               <p className="text-sm italic">No conversations yet</p>
+            <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+               <MessageSquare size={20} className="mb-2 opacity-20" />
+               <p className="text-[10px] font-bold uppercase tracking-widest">No conversations</p>
             </div>
           )}
           {chats.map(c => (
             <div 
               key={c.id} 
               onClick={() => selectChat(c)}
-              className={`p-4 rounded-2xl cursor-pointer transition-all border group relative overflow-hidden ${activeChat?.id === c.id ? 'bg-slate-800/80 border-slate-600 shadow-2xl glow-primary' : 'border-transparent hover:bg-slate-800/40 hover:border-slate-700/50'}`}
+              className={`p-4 rounded-2xl cursor-pointer transition-all border group relative ${activeChat?.id === c.id ? 'bg-white dark:bg-brand-surface-dark border-primary-500 shadow-premium dark:shadow-premium-dark' : 'bg-transparent border-transparent hover:bg-white/50 dark:hover:bg-white/5'}`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className={`font-bold transition-colors ${activeChat?.id === c.id ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>{c.customerName}</span>
-                <span className={`w-2.5 h-2.5 rounded-full ring-4 ring-slate-900/50 ${c.sentiment === 'angry' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]' : c.sentiment === 'happy' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-500'}`}></span>
+                <span className={`text-xs font-bold ${activeChat?.id === c.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>{c.customerName}</span>
+                <span className={`w-2 h-2 rounded-full ${c.sentiment === 'angry' ? 'bg-rose-500' : c.sentiment === 'happy' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase font-black tracking-tighter text-slate-500 group-hover:text-slate-400">
-                  {c.Ticket?.category || 'General'} • {c.Ticket?.priority || 'Medium'}
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                  {c.Ticket?.category || 'General'}
                 </p>
-                <p className="text-[10px] text-slate-600">{new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                <p className="text-[10px] text-slate-400">{new Date(c.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
-              {activeChat?.id === c.id && <div className="absolute left-0 top-0 w-1 h-full bg-primary"></div>}
             </div>
           ))}
         </div>
       </div>
       
       {/* 2. Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full bg-slate-900 relative">
+      <div className="flex-1 flex flex-col h-full bg-white dark:bg-brand-dark relative transition-colors">
         {activeChat ? (
           <>
-            <div className="px-8 py-5 border-b border-slate-700/30 bg-slate-900/60 backdrop-blur-xl flex justify-between items-center z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 text-primary flex items-center justify-center shadow-inner border border-white/5">
-                   <UserIcon size={24} />
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-brand-border-dark bg-white dark:bg-brand-dark flex justify-between items-center z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-white/5 text-primary-600 flex items-center justify-center">
+                   <UserIcon size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white tracking-tight">{activeChat.customerName}</h3>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">{activeChat.customerName}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
-                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-widest text-white uppercase shadow-lg ${sentiment === 'angry' ? 'bg-rose-500 glow-rose' : sentiment === 'happy' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-slate-600'}`}>
+                     <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-tight ${sentiment === 'angry' ? 'bg-rose-50 text-rose-600' : sentiment === 'happy' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 dark:bg-white/10 text-slate-500'}`}>
                        {sentiment}
                      </span>
                      {activeChat.status === 'closed' && (
-                       <span className="bg-slate-800/80 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-widest text-slate-400 border border-slate-700 uppercase">RESOLVED</span>
+                       <span className="bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded-lg text-[9px] font-bold text-slate-400 uppercase tracking-tight">RESOLVED</span>
                      )}
-                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   </div>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {activeChat.status === 'open' && (
-                  <>
-                    <button 
-                      onClick={simulateCustomerMessage} 
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
-                    >
-                      Simulate
-                    </button>
-                    <button 
-                      onClick={closeActiveChat}
-                      className="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all active:scale-95"
-                    >
-                      Resolve
-                    </button>
-                  </>
+                  <button 
+                    onClick={closeActiveChat}
+                    className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-1.5 px-4 rounded-xl text-[10px] transition-all"
+                  >
+                    Resolve
+                  </button>
                 )}
               </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
               {messages.length === 0 && (
-                <div className="flex flex-col h-full items-center justify-center text-slate-600 gap-4">
-                   <Bot size={48} className="animate-pulse-soft opacity-20" />
-                   <p className="text-sm italic">Secure channel established. Waiting for message...</p>
+                <div className="flex flex-col h-full items-center justify-center text-slate-300 gap-2">
+                   <Bot size={32} className="opacity-10" />
+                   <p className="text-[10px] font-bold uppercase tracking-widest italic">Awaiting connection...</p>
                 </div>
               )}
               {messages.map((m, i) => (
                 <div key={m.id || i} className={`flex flex-col ${m.senderType === 'agent' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[75%] rounded-3xl px-6 py-4 shadow-2xl transition-all hover:scale-[1.01] ${m.senderType === 'agent' ? 'bg-gradient-to-br from-primary to-primary-light text-white rounded-br-none shadow-primary/20' : m.senderType === 'customer' ? 'bg-slate-800 text-slate-100 border border-slate-700/50 rounded-bl-none' : 'bg-slate-700/50 text-slate-300 font-mono text-xs italic rounded-2xl'}`}>
-                    <p className="whitespace-pre-wrap leading-relaxed font-medium">{m.message}</p>
+                  <div className={`max-w-[75%] px-4 py-3 shadow-sm ${m.senderType === 'agent' ? 'chat-bubble-agent' : m.senderType === 'customer' ? 'chat-bubble-customer' : 'bg-slate-100 dark:bg-white/5 text-slate-500 text-[10px] rounded-xl'}`}>
+                    <p className="text-sm leading-relaxed">{m.message}</p>
                   </div>
-                  <span className="text-[10px] text-slate-600 mt-2 px-2 font-bold uppercase tracking-widest">
+                  <span className="text-[9px] font-bold text-slate-400 mt-2 px-1 uppercase">
                     {m.senderType} • {new Date(m.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -356,96 +312,75 @@ const ChatView = () => {
               <div ref={messagesEndRef} />
             </div>
             
-            <div className="p-6 border-t border-slate-700/30 bg-slate-900/80 backdrop-blur-2xl">
+            <div className="p-6 bg-white dark:bg-brand-dark border-t border-slate-200 dark:border-brand-border-dark">
               {activeChat.status === 'open' ? (
-                <form onSubmit={sendMessage} className="flex gap-4 max-w-5xl mx-auto items-end relative group">
+                <form onSubmit={sendMessage} className="flex gap-4 max-w-5xl mx-auto items-end">
                   <div className="flex-1 relative">
                     <textarea 
-                      className="w-full bg-slate-800/50 border border-slate-700/50 rounded-2xl px-6 py-4 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all min-h-[60px] resize-none shadow-inner" 
-                      placeholder="Secure message to client..."
+                      className="input-field min-h-[50px] max-h-[150px] resize-none py-3.5" 
+                      placeholder="Type your response..."
                       value={inputMsg}
                       onChange={(e) => setInputMsg(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
                     />
-                    <div className="absolute right-4 bottom-3 text-[10px] font-bold text-slate-600 pointer-events-none">ENTER TO SEND</div>
                   </div>
-                  <button type="submit" disabled={!inputMsg.trim()} className="h-[60px] w-[60px] flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-light text-white shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all transition-transform">
-                    <Send size={24} className="ml-1" />
+                  <button type="submit" disabled={!inputMsg.trim()} className="h-[50px] w-[50px] flex items-center justify-center rounded-2xl bg-primary-600 text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 active:scale-95 disabled:opacity-30 transition-all">
+                    <Send size={20} />
                   </button>
                 </form>
               ) : (
-                <div className="max-w-4xl mx-auto p-6 bg-slate-800/30 rounded-2xl border border-slate-700/50 text-center flex flex-col items-center gap-2">
-                  <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-[0.2em] mb-1">Archived Session</span>
-                  <p className="text-slate-400 text-sm italic font-medium">This conversation was marked as resolved. Re-open via customer message.</p>
+                <div className="max-w-xl mx-auto p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-brand-border-dark text-center">
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Archived Conversation</p>
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-6">
-            <div className="w-32 h-32 rounded-full bg-slate-800/30 flex items-center justify-center border border-slate-700/30 animate-pulse-soft">
-              <MessageSquare size={48} className="opacity-10" />
+          <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
+            <div className="w-20 h-20 rounded-3xl bg-slate-50 dark:bg-white/5 flex items-center justify-center border border-slate-200 dark:border-brand-border-dark">
+              <MessageSquare size={32} className="opacity-20" />
             </div>
-            <p className="text-lg font-black tracking-widest text-slate-700 uppercase">Select a Channel to begin</p>
+            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Select a conversation</p>
           </div>
         )}
       </div>
       
       {/* 3. AI Copilot Sidebar */}
-      <div className="w-[320px] border-l border-slate-700/30 flex flex-col bg-slate-900/60 backdrop-blur-2xl z-20 shadow-[-20px_0_40px_rgba(0,0,0,0.3)]">
-        <div className="p-6 border-b border-slate-700/30 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary-light shadow-inner">
-            <Bot size={24} className="animate-pulse-soft" />
+      <div className="w-[260px] border-l border-slate-200 dark:border-brand-border-dark flex flex-col bg-slate-50/50 dark:bg-brand-surface-dark/20 transition-colors">
+        <div className="p-4 border-b border-slate-200 dark:border-brand-border-dark flex items-center gap-2 bg-white dark:bg-brand-surface-dark">
+          <div className="w-8 h-8 rounded-xl bg-primary-50 dark:bg-primary-500/10 flex items-center justify-center text-primary-600">
+            <Sparkles size={18} fill="currentColor" />
           </div>
           <div>
-            <h2 className="font-black text-white uppercase tracking-[0.2em] text-xs">AI Copilot</h2>
-            <div className="flex items-center gap-1.5 mt-0.5">
-               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-               <span className="text-[8px] font-black text-slate-500 uppercase">Neural Link Active</span>
-            </div>
+            <h2 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-[10px]">Intelligence</h2>
           </div>
         </div>
         
         <div className="flex-1 p-5 overflow-y-auto space-y-6 scrollbar-hide">
           {activeChat ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="space-y-6">
               
-              {/* Sentiment Card */}
-              <div className="glass-card p-5 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <AlertCircle size={64} />
-                </div>
-                <h3 className="font-black text-[10px] text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                   Live Sentiment
-                </h3>
-                <div className={`p-4 rounded-xl flex items-center justify-center font-black text-lg tracking-[0.1em] border uppercase transition-all ${sentiment === 'angry' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 glow-rose' : sentiment === 'happy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                  {sentiment}
-                </div>
-              </div>
-
-              {/* Ticket Management Section */}
-              <div className="glass-card p-5 rounded-2xl bg-slate-800/40 relative group">
-                <div className="flex justify-between items-center mb-5">
-                  <h3 className="font-black text-[10px] text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                    Classification
-                  </h3>
+              {/* Metadata Section */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Context</h3>
                   <button 
                     onClick={updateTicket}
-                    className="text-[9px] font-black text-primary-light hover:text-white uppercase tracking-tighter bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 transition-all active:scale-95"
+                    className="text-[10px] font-bold text-primary-600 hover:text-primary-700 uppercase"
                   >
-                    Commit
+                    Update
                   </button>
                 </div>
                 
-                <div className="space-y-5">
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block px-1">Priority Level</label>
-                    <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-tight ml-1">Priority</label>
+                    <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-black/20 p-1 rounded-xl">
                       {['low', 'medium', 'high'].map(p => (
                         <button 
                           key={p}
                           onClick={() => setTicketForm({ ...ticketForm, priority: p })}
-                          className={`py-2 text-[9px] font-black uppercase rounded-lg border transition-all ${ticketForm.priority === p ? 'bg-primary border-primary text-white shadow-lg glow-primary' : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'}`}
+                          className={`py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${ticketForm.priority === p ? 'bg-white dark:bg-brand-surface-dark text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
                         >
                           {p}
                         </button>
@@ -453,111 +388,61 @@ const ChatView = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block px-1">Issue Status</label>
-                    <select 
-                      value={ticketForm.status}
-                      onChange={(e) => setTicketForm({ ...ticketForm, status: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
-                    >
-                      <option value="open">Open Session</option>
-                      <option value="in_progress">In Analysis</option>
-                      <option value="resolved">Resolved</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase mb-2 block px-1">Category Tag</label>
-                    <div className="relative">
-                      <input 
-                        type="text"
-                        value={ticketForm.category}
-                        onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
-                        placeholder="e.g. BILLING"
-                      />
-                      <Plus size={14} className="absolute right-4 top-3.5 text-slate-600" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-tight ml-1">Category</label>
+                    <input 
+                      type="text"
+                      value={ticketForm.category}
+                      onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
+                      className="input-field text-[11px] py-2"
+                      placeholder="e.g. BILLING"
+                    />
                   </div>
                 </div>
               </div>
 
               {/* AI Summary Card */}
-              <div className="glass-card p-5 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 group-hover:w-2 transition-all"></div>
+              <div className="bg-white dark:bg-brand-surface-dark p-4 rounded-2xl border border-slate-200 dark:border-brand-border-dark shadow-sm">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-black text-[10px] text-slate-500 uppercase tracking-widest">Neural Summary</h3>
-                  <button 
-                    type="button"
-                    onClick={generateSummary}
-                    disabled={isSummarizing}
-                    className="text-[9px] font-black text-amber-500 hover:text-amber-400 uppercase tracking-widest disabled:opacity-50 transition-colors"
-                  >
-                    {isSummarizing ? 'Processing...' : 'Refresh'}
-                  </button>
+                  <h3 className="font-bold text-[10px] text-slate-900 dark:text-white uppercase tracking-widest">Summary</h3>
+                  <button onClick={generateSummary} disabled={isSummarizing} className="text-[10px] text-primary-600 disabled:opacity-50 font-bold uppercase">Run</button>
                 </div>
                 {aiSummary ? (
-                  <p className="text-xs text-slate-300 leading-relaxed font-medium italic opacity-90">"{aiSummary}"</p>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">"{aiSummary}"</p>
                 ) : (
-                  <button 
-                    type="button"
-                    onClick={generateSummary}
-                    disabled={isSummarizing}
-                    className="w-full py-4 border-2 border-dashed border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-400 hover:border-slate-700 transition-all"
-                  >
-                    {isSummarizing ? 'Connecting...' : 'Generate Insights'}
-                  </button>
+                  <div className="text-center py-2">
+                    <p className="text-[10px] text-slate-400 italic">No summary generated</p>
+                  </div>
                 )}
               </div>
 
               {/* Smart Suggestion Card */}
-              <div className="glass-card p-5 rounded-2xl relative overflow-hidden group border-primary/20 glow-primary">
-                <div className="absolute top-0 left-0 w-1 h-full bg-primary group-hover:w-2 transition-all"></div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-black text-[10px] text-primary-light uppercase tracking-widest">Smart Suggestion</h3>
-                  <button 
-                    type="button"
-                    onClick={async () => {
-                      if (!activeChat || messages.length === 0) return;
-                      try {
-                        const lastMsg = [...messages].reverse().find(m => m.senderType === 'customer');
-                        if (!lastMsg) return toast.error('No customer message to reply to');
-                        const res = await aiAPI.getSuggestion(activeChat.id, lastMsg.message);
-                        setAiSuggestion(res.data.data.suggestion);
-                        toast.success('Reply recalibrated');
-                      } catch (err) {
-                        toast.error('Neural link failure');
-                      }
-                    }}
-                    className="text-[9px] font-black text-slate-500 hover:text-primary-light uppercase tracking-widest transition-colors"
-                  >
-                    Regenerate
-                  </button>
+              <div className="bg-primary-600 p-5 rounded-2xl shadow-xl shadow-primary-600/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles size={14} className="text-primary-100" />
+                  <h3 className="font-bold text-[10px] text-white uppercase tracking-widest">Suggestion</h3>
                 </div>
                 {aiSuggestion ? (
                   <div className="space-y-4">
-                    <p className="text-sm text-slate-100 font-medium leading-relaxed italic border-l-2 border-primary/30 pl-4 py-1">"{aiSuggestion}"</p>
+                    <p className="text-[11px] text-primary-50 font-medium leading-relaxed italic">"{aiSuggestion}"</p>
                     <button 
                       onClick={applySuggestion}
-                      className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-primary/20 active:scale-95"
+                      className="w-full bg-white text-primary-600 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-50 transition-all shadow-lg"
                     >
-                      Use Intel
+                      Apply
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center py-4 gap-2 opacity-30">
-                    <Bot size={24} className="text-slate-600" />
-                    <p className="text-[10px] font-black uppercase text-slate-600">Awaiting Input</p>
+                  <div className="text-center py-2">
+                    <p className="text-[10px] text-primary-200 italic">Listening for context...</p>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 gap-4">
-               <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-800 flex items-center justify-center">
-                  <Bot size={32} className="text-slate-800" />
-               </div>
-               <p className="text-[10px] font-black uppercase tracking-widest text-slate-700">Neural insights available upon selection</p>
+            <div className="h-full flex flex-col items-center justify-center text-center opacity-20 gap-3">
+               <Sparkles size={24} className="text-slate-400" />
+               <p className="text-[9px] font-bold uppercase tracking-widest">AI Standby</p>
             </div>
           )}
         </div>

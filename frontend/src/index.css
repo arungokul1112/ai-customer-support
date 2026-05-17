@@ -1,55 +1,108 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* Tailwind v4 Dark Mode Configuration */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand Colors */
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-200: #ddd6fe;
+  --color-primary-300: #c4b5fd;
+  --color-primary-400: #a78bfa;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+  --color-primary-800: #5b21b6;
+  --color-primary-900: #4c1d95;
+  --color-primary-950: #2e1065;
+
+  --color-brand-light: #ffffff;
+  --color-brand-dark: #0a0a0a;
+  --color-brand-surface-light: #f9fafb;
+  --color-brand-surface-dark: #121212;
+  --color-brand-border-light: #e5e7eb;
+  --color-brand-border-dark: #262626;
+
+  /* Color Aliases for Compatibility */
+  --color-slate-50: var(--color-gray-50);
+  --color-slate-100: var(--color-gray-100);
+  --color-slate-200: var(--color-gray-200);
+  --color-slate-300: var(--color-gray-300);
+  --color-slate-400: var(--color-gray-400);
+  --color-slate-500: var(--color-gray-500);
+  --color-slate-600: var(--color-gray-600);
+  --color-slate-700: var(--color-gray-700);
+  --color-slate-800: var(--color-gray-800);
+  --color-slate-900: var(--color-gray-900);
+  --color-slate-950: var(--color-gray-950);
+
+  /* Typography */
+  --font-sans: "Geist", "Inter", "system-ui", "sans-serif";
+  --font-mono: "Fira Code", "monospace";
+
+  /* Radii */
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+
+  /* Shadows */
+  --shadow-premium: 0 0 0 1px rgba(0,0,0,0.05), 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  --shadow-premium-dark: 0 0 0 1px rgba(255,255,255,0.05), 0 4px 6px -1px rgba(0,0,0,0.2), 0 2px 4px -1px rgba(0,0,0,0.1);
+}
 
 @layer base {
   body {
-    @apply bg-slate-900 text-slate-100 font-sans tracking-wide;
+    @apply antialiased text-gray-900 bg-white dark:bg-brand-dark dark:text-gray-100 transition-colors duration-300;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv11";
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 shadow-xl;
-  }
-  
-  .glass-input {
-    @apply w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all;
+    @apply bg-white dark:bg-brand-surface-dark border border-gray-200 dark:border-brand-border-dark shadow-sm dark:shadow-premium-dark transition-all;
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-primary to-primary-light text-white font-medium py-2 px-4 rounded-lg hover:shadow-lg hover:shadow-primary/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 shadow-sm;
   }
 
   .btn-secondary {
-    @apply bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium py-2 px-4 rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-white dark:bg-brand-surface-dark border border-gray-200 dark:border-brand-border-dark hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 font-semibold py-2 px-4 rounded-xl transition-all active:scale-95;
   }
 
-  .glow-primary {
-    @apply shadow-[0_0_20px_rgba(99,102,241,0.2)];
+  .input-field {
+    @apply w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-brand-border-dark rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all placeholder:text-gray-400 dark:placeholder:text-gray-600;
   }
 
-  .glow-amber {
-    @apply shadow-[0_0_20px_rgba(245,158,11,0.2)];
+  /* Modern Chat Bubbles */
+  .chat-bubble-agent {
+    @apply bg-primary-600 text-white rounded-2xl rounded-tr-none shadow-sm;
   }
 
-  .glow-rose {
-    @apply shadow-[0_0_20px_rgba(244,63,94,0.2)];
+  .chat-bubble-customer {
+    @apply bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-100 rounded-2xl rounded-tl-none border border-gray-200 dark:border-white/5;
   }
 
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-light;
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-200 dark:bg-white/10 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-300 dark:bg-white/20;
   }
 }
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
-}
-
-@keyframes pulse-soft {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(0.98); }
-}
-
-.animate-pulse-soft {
-  animation: pulse-soft 3s ease-in-out infinite;
 }

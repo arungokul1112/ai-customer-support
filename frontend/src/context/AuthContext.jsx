@@ -47,11 +47,24 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">Loading...</div>;
+  const value = React.useMemo(() => ({
+    user,
+    login,
+    register,
+    logout,
+    loading
+  }), [user, loading]);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center bg-brand-surface-light dark:bg-brand-dark transition-colors">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Initializing Ecosystem</p>
+          </div>
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };
